@@ -1,6 +1,4 @@
 #!user/bin/env python
-
-
 def twitter_search_mongodb_update(dbname,search,oAuth):
 	#Continously updates the collections in mongodb localhost given the search term. 
 	#oAuth is a dictionary containing twitter authorization keys. ß 
@@ -10,7 +8,7 @@ def twitter_search_mongodb_update(dbname,search,oAuth):
 	import json
 	#Using MongoDB
 	connection = pymongo.MongoClient("mongodb://localhost")
-	dbtm = connection.turkeymonitor
+	dbtm = connection[dbname]
 	tweets = dbtm.tweets
 	#Connect to Twitter API
 	t = twitter.Twitter(domain='api.twitter.com', api_version='1.1', auth=twitter.oauth.OAuth(oAuth['oauth_token'],oAuth['oauth_secret'],oAuth['consumer_key'],oAuth['consumer_secret']))
