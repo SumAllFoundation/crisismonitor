@@ -1,4 +1,4 @@
-#!user/bin/env python
+#!/usr/local/bin/python python
 def twitter_entities_mongodb_timestamp(dbname):
 	#Returns timeseries of hashtags and mentions from given database in MongoDB with
 	#the collection name tweets. 

@@ -1,4 +1,4 @@
-#!user/bin/env python
+#!/usr/local/bin/python python
 def twitter_search_mongodb_update(dbname,search,oAuth):
 	#Continously updates the collections in mongodb localhost given the search term. 
 	#oAuth is a dictionary containing twitter authorization keys. ß 
