@@ -22,3 +22,37 @@ def twitter_top_entities_timeseries(df,time_interval,nitems):
 	#For MongoDB: Convert dtype to float
 	tsh = tsh.astype(float)
 	return(tsh)
+
+def twitter_top_entities_by_timeinterval(time_interval,nitems,*dfs):
+	#Retrieves top n items for each time interval and 
+	#[dic,count]=twitter_top_entities_by_timeinterval('D',10,hts,mts,uts,pts)
+	import pandas
+	import numpy as np
+	import time
+	from pandas import DataFrame
+	count = {}
+	dic={}
+	#Break the entire time series into periods specified by time interval
+	for df in dfs:
+		print df.name
+		#Convert to PeriodIndex
+		dfperiod = df.to_period(time_interval)
+		timeperiod = unique(dfperiod.index.tolist())
+		#Create a List of Dictionaries
+		diclist = []
+		cntlist = []
+		for interval in timeperiod:
+			temp =   dfperiod.ix[interval].value_counts()[:nitems]
+			#Np.int64 not serializable
+			temp = temp.asfloat()
+			#Dictionary of top items each timeperiod
+			#Dictionary List
+			diclist.append({interval.strftime('%D'): temp.to_dict()})
+			#Append the dictionary list to dictionary
+			dic[dfperiod.name]    = diclist
+			#Total items each time period
+			cntlist.append({interval.strftime('%D'): len(dfperiod.ix[interval])})
+			#Append the dictionary list to dictionary
+			count[dfperiod.name]  =  cntlist
+	return(dic,count)
+

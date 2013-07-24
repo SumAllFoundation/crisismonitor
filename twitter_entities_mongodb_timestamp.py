@@ -13,9 +13,10 @@ def twitter_entities_mongodb_timestamp(dbname):
 	from dateutil import parser
 
 	#Define Python Lists
-	m = []
-	h = []
-	u = []
+	men = []
+	has = []
+	url = []
+	med = []
 
 	#Using MongoDB
 	connection = MongoClient("mongodb://localhost")
@@ -28,32 +29,42 @@ def twitter_entities_mongodb_timestamp(dbname):
 			hashtags = [hashtag['text'] for hashtag in tweet['entities']['hashtags']]
 			mentions = [mentions['screen_name'] for mentions in tweet['entities']['user_mentions']]
 			urls = [urls['expanded_url'] for urls in tweet['entities']['urls']]
+			if 'media' in tweet['entities'].keys():
+				media  = [media['expanded_url'] for media in tweet['entities']['media'] ]
 			#Build the list
-			m.append([{'time': parser.parse(tweet['created_at']),'mention': mention} for mention in mentions if mentions])
-			h.append([{'time': parser.parse(tweet['created_at']),'hashtag': hashtag} for hashtag in hashtags if hashtags])
-			u.append([{'time': parser.parse(tweet['created_at']),'url': url} for url in urls if urls])
+			men.append([{'time': parser.parse(tweet['created_at']),'mention': mention} for mention in mentions if mentions])
+			has.append([{'time': parser.parse(tweet['created_at']),'hashtag': hashtag} for hashtag in hashtags if hashtags])
+			url.append([{'time': parser.parse(tweet['created_at']),'url': u} for u in urls if urls])
+			med.append([{'time': parser.parse(tweet['created_at']),'media':m} for m in media if media])
 		else:
 			print tweet['_id'], ' not retrieved'
 	#Filter out the empty entries
-	m = filter(None,m)
-	h = filter(None,h)
-	u = filter(None,u)
+	men = filter(None,men)
+	has = filter(None,has)
+	url = filter(None,url)
+	med = filter(None,med)
+
 	#Collapse the list of dicts
-	m = list(itertools.chain(*m))
-	h = list(itertools.chain(*h))
-	u = list(itertools.chain(*u))
+	men= list(itertools.chain(*men))
+	has = list(itertools.chain(*has))
+	url = list(itertools.chain(*url))
+	med = list(itertools.chain(*med))
 	#DataFrame indexed to timestamps. 
-	h = pandas.DataFrame.from_records(h)
-	h.index=h.time
-	hts=Series(h.hashtag,h.index)
-	m = pandas.DataFrame.from_records(m)
-	m.index = m.time
-	mts=Series(m.mention,m.index)
-	u = pandas.DataFrame.from_records(u)
-	u.index =u.time
-	uts = Series(u.url,u.index)
+	has = pandas.DataFrame.from_records(has)
+	has.index=has.time
+	hts=Series(has.hashtag,has.index)
+	men = pandas.DataFrame.from_records(men)
+	men.index = men.time
+	mts=Series(men.mention,men.index)
+	url = pandas.DataFrame.from_records(url)
+	url.index =url.time
+	uts = Series(url.url,url.index)
+	med = pandas.DataFrame.from_records(med)
+	med.index =med.time
+	pts = Series(med.media,med.index)
 	#Lower case
 	mts = mts.str.lower()
 	hts = hts.str.lower()
 	uts = uts.str.lower()
-	return(mts,hts,uts)
+	pts = pts.str.lower()
+	return(mts,hts,uts,pts)
