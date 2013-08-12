@@ -1,5 +1,5 @@
 #!/usr/local/bin/python python
-def twitter_search_mongodb_update(dbname,search,oAuth):
+def twitter_search_mongodb_update(dbname,search,oAuth,count):
 	#Continously updates the collections in mongodb localhost given the search term.
 	#Search term does not include hashtag.
 	#oAuth is a dictionary containing twitter authorization keys. 
@@ -19,7 +19,7 @@ def twitter_search_mongodb_update(dbname,search,oAuth):
 		try:
 			for term in search:
 				term = '#'+term
-				tw = t.search.tweets(count=100,q=term,show_user=True)
+				tw = t.search.tweets(count=count,q=term,show_user=True)
 				statuses = tw['statuses']
 				for status in statuses:
 					try:	

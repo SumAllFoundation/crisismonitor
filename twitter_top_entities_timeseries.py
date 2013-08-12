@@ -43,8 +43,8 @@ def twitter_top_entities_by_timeinterval(time_interval,nitems,*dfs):
 		cntlist = []
 		for interval in timeperiod:
 			temp =   dfperiod.ix[interval].value_counts()[:nitems]
-			#Np.int64 not serializable
-			temp = temp.asfloat()
+			#Np.int64 not serializable. Switch to float to 
+			temp = temp.astype(float)
 			#Dictionary of top items each timeperiod
 			#Dictionary List
 			diclist.append({interval.strftime('%D'): temp.to_dict()})
