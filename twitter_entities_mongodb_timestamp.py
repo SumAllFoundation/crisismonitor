@@ -30,7 +30,7 @@ def twitter_entities_mongodb_timestamp(dbname):
 			mentions = [mentions['screen_name'] for mentions in tweet['entities']['user_mentions']]
 			urls = [urls['expanded_url'] for urls in tweet['entities']['urls']]
 			if 'media' in tweet['entities'].keys():
-				media  = [media['expanded_url'] for media in tweet['entities']['media'] ]
+				media  = [media['media_url'] for media in tweet['entities']['media'] ]
 			#Build the list
 			men.append([{'time': parser.parse(tweet['created_at']),'mention': mention} for mention in mentions if mentions])
 			has.append([{'time': parser.parse(tweet['created_at']),'hashtag': hashtag} for hashtag in hashtags if hashtags])
@@ -43,9 +43,8 @@ def twitter_entities_mongodb_timestamp(dbname):
 	has = filter(None,has)
 	url = filter(None,url)
 	med = filter(None,med)
-
 	#Collapse the list of dicts
-	men= list(itertools.chain(*men))
+	men = list(itertools.chain(*men))
 	has = list(itertools.chain(*has))
 	url = list(itertools.chain(*url))
 	med = list(itertools.chain(*med))
@@ -63,8 +62,8 @@ def twitter_entities_mongodb_timestamp(dbname):
 	med.index =med.time
 	pts = Series(med.media,med.index)
 	#Lower case
-	mts = mts.str.lower()
-	hts = hts.str.lower()
-	uts = uts.str.lower()
-	pts = pts.str.lower()
+	#mts = mts.str.lower()
+	#hts = hts.str.lower()
+	# uts = uts.str.lower()
+	# #pts = pts.str.lower() #Do not lower case. Case sensitive
 	return(mts,hts,uts,pts)
