@@ -1,6 +1,6 @@
 
 #!/usr/local/bin/python python
-def twitter_entities_mongodb_timestamp(dbname,host):
+def twitter_entities_mongodb_timestamp(dbname,host,*date):
 	#Returns timeseries of hashtags and mentions from given database in MongoDB with
 	#the collection name tweets. 
 	#Encoded
@@ -9,15 +9,22 @@ def twitter_entities_mongodb_timestamp(dbname,host):
 	has = []
 	url = []
 	med = []
+	count = 0
+	#Date Retrieval
+	ldt = parser.parse(date[0])
+	lts = float(calendar.timegm(ldt.utctimetuple())*1000)
+	udt = parser.parse(date[1])
+	uts = float(calendar.timegm(udt.utctimetuple())*1000)
 
 	#Using MongoDB
 	connection = pymongo.MongoClient(host)
-	print connection
+	print 'Retrieving tweets from: ', ldt, ' to: ', udt
 	db= connection[dbname]
 	tweets = db.tweets
-	#Go through the tweets collection. 
-	for tweet in tweets.find():
+	#Retrieve the tweets for a given date and after only.
+	for tweet in tweets.find({"timestamp" : {"$gt": lts, "$lt": uts}}):
 		#{'entities': tweet['entities'],'created_at': tweet['created_at']}#
+		count += 1 
 		if 'entities' in tweet.keys():
 			hashtags = [hashtag['text'] for hashtag in tweet['entities']['hashtags']]
 			mentions = [mentions['screen_name'] for mentions in tweet['entities']['user_mentions']]
@@ -26,15 +33,16 @@ def twitter_entities_mongodb_timestamp(dbname,host):
 				media  = [media['media_url'] for media in tweet['entities']['media'] ]
 			#Build the list
 			#datetime.utcfromtimestamp(tweet['timestamp']/1000)
-			men.append([{'time': dateutil.parser.parse(tweet['created_at']),'mention': mention} for mention in mentions if mentions])
-			has.append([{'time': dateutil.parser.parse(tweet['created_at']),'hashtag': hashtag} for hashtag in hashtags if hashtags])
-			url.append([{'time': dateutil.parser.parse(tweet['created_at']),'url': u} for u in urls if urls])
+			men.append([{'time': datetime.utcfromtimestamp(tweet['timestamp']/1000),'mention': mention} for mention in mentions if mentions])
+			has.append([{'time': datetime.utcfromtimestamp(tweet['timestamp']/1000),'hashtag': hashtag} for hashtag in hashtags if hashtags])
+			url.append([{'time': datetime.utcfromtimestamp(tweet['timestamp']/1000),'url': u} for u in urls if urls])
 			if 'media' in tweet['entities'].keys():
 				med.append([{'time': dateutil.parser.parse(tweet['created_at']),'media':m} for m in media if media])
+				print count, media
 		else:
 			print tweet['_id'], ' not retrieved'
 	#Filter out the empty entries
-	print 'Retrieval complete. Retrieved ', len(has), ' items'
+	print 'Retrieval complete. Retrieved ', count, ' tweets'
 	men = filter(None,men)
 	has = filter(None,has)
 	url = filter(None,url)
@@ -99,7 +107,7 @@ def twitter_top_entities_by_timeinterval(*dfs):
 		for timeperiod in timeperiods:
 			#Date
 			date = timeperiod.strftime('%'+time_interval)
-			temp = dfperiod.ix[timeperiod].value_counts()[:nitems[n]]
+			temp = dfperiod.ix[date].value_counts()[:nitems[n]]
 			#Np.int64 not serializable. Switch to float to 
 			temp = temp.astype(float)
 			#Create temp lists to append to each dictionary
@@ -136,7 +144,7 @@ def twitter_top_entities_by_timeinterval(*dfs):
 					dic[df.name] = metricList
 					if df.name in 'hashtag':
 						#Adding KPI dictionary. 
-						dic['KPI'] = {df.name: len(dfperiod.ix[timeperiod])}
+						dic['KPI'] = {df.name: len(dfperiod.ix[date])}
 	return(output)
 
 def html_title_retrieve(url):
@@ -189,6 +197,24 @@ def tagging_events(tags_file_name,rawDict):
 	embeddedDict = rawDict
 	return(embeddedDict)
 
+def override_kpis(output,override_file_name):
+	overrides=[]
+	with open('%s.json' %(override_file_name)) as f:
+	    for line in f:
+	        overrides.append(json.loads(line))
+	overrides = overrides[0]
+	#Override dates specified in the file
+	for override in overrides:
+		for entry in output:
+			if entry['date'] in override['date']:
+				print 'overriding ', entry['date']
+				for h in entry['hashtag']:
+					temp= round(h['total'] * override['est'])
+					h['total'] = temp
+				entry['KPI']['hashtag'] = round(override['est'] * entry['KPI']['hashtag'])
+	newoutput = output
+	return(newoutput)
+
 if __name__ == "__main__":
 	import sys, getopt
 	import twitter
@@ -196,8 +222,10 @@ if __name__ == "__main__":
 	from pymongo import MongoClient
 	import itertools
 	from pandas import Series
-	import dateutil 
-	import datetime
+	import dateutil
+	import calendar
+	from dateutil import parser
+	from datetime import datetime
 	import json
 	import pandas
 	import numpy as np
@@ -209,7 +237,7 @@ if __name__ == "__main__":
 	#Cut it into daily periods
 	#Tag events 
 	try:
-		opts,args = getopt.getopt(sys.argv[1:],'d:i:o:h:', ['db=','input=','output=','host='])
+		opts,args = getopt.getopt(sys.argv[1:],'d:i:o:h:s:e:r', ['db=','input=','output=','host=','start=','end=','override='])
 	except getopt.GetoptError:
 		pass
 	#Parse Arguments
@@ -222,57 +250,42 @@ if __name__ == "__main__":
 			output_file_name = arg
 		elif opt in ('-h','--host'):
 			host = arg
-	print db, tags_file_name, output_file_name, host
+		elif opt in ('-s','--start'):
+			start = arg
+		elif opt in ('-e','--end'):
+			end = arg
+		elif opt in ('-r','--override'):
+			override_file_name = arg
+	print 'database: ', db, 'input file: ', tags_file_name, 'output file: ', output_file_name, 'host: ', host, 'start date: ', start, 'end date: ', end, 'overrides: ', override_file_name
 	#Create the JSON File
-	[mts,hts,uts,pts] = twitter_entities_mongodb_timestamp(db,host)
+	[mts,hts,uts,pts] = twitter_entities_mongodb_timestamp(db,host,start,end)
+	#Create time interval
 	output	 =	twitter_top_entities_by_timeinterval(mts,hts,uts,pts)
-	#If events are appended to input arguments
-	embedded = tagging_events(tags_file_name,output)
+	#Events are appended to input arguments
+	output = tagging_events(tags_file_name,output)
 	#Write raw file
-	f = open('%s-raw.json' %(output_file_name),'w')
-	f.write(json.dumps(embedded))
+	f = open('%s-new.json' %(output_file_name),'w')
+	f.write(json.dumps(output))
 	f.close()
-	####MANUPULATION OF VOLUME DATA##############
-	#Estimation. Scales the numbers up using 09/05
-	estimates = [{'date': '08/23/13', 'est': 20},
-	{'date': '08/24/13', 'est': 21},
-	{'date': '08/25/13', 'est': 21},
-	{'date': '08/26/13', 'est': 29},
-	{'date': '08/27/13', 'est': 65},
-	{'date': '08/28/13', 'est': 89},
-	{'date': '08/29/13', 'est': 86},
-	{'date': '08/30/13', 'est': 89},
-	{'date': '08/31/13', 'est': 100},
-	{'date': '09/01/13', 'est': 79},
-	{'date': '09/02/13', 'est': 57},
-	{'date': '09/03/13', 'est': 29},
-	{'date': '09/08/13', 'est': 50}]
-	scale = int([entry['KPI']['hashtag']/67 for entry in embedded if entry['date'] in '09/05/13'][0])
-	for estimate in estimates:
-		for entry in embedded:
-			if entry['date'] in estimate['date']:
-				for h in entry['hashtag']:
-					print entry['date'], h 
-					print h['total'], ' before'
-					temp= round(h['total'] / entry['KPI']['hashtag'] * estimate['est'] * scale)
-					h['total'] = temp
-					print h['total'], ' after'
-				entry['KPI']['hashtag'] = round(estimate['est'] * scale)
-	for entry in embedded:
-		if entry['date'] in ['09/04/13','09/04/13','09/05/13','09/06/13','09/07/13','09/08/13','09/09/13']:
-			for h in entry['hashtag']:
-				h['total'] = h['total'] * 1.5
+	print 'New data is written to file'
+	#Open existing dictionary
+	f = open('%s.json' %(output_file_name),'r')
+	existing =[]
+	for line in f:
+		existing.append(json.loads(line))
+	existing = existing[0]
+	#Merge
+	newoutput = output + existing
 	###############################
+	#Overrides
+	newoutput = override_kpis(newoutput,override_file_name)
 	#Write to file
 	f = open('%s.json' %(output_file_name),'w')
-	f.write(json.dumps(embedded))
+	f.write(json.dumps(newoutput))
 	f.close()
 	print 'Output written to ', output_file_name
 
-	for entry in embedded:
-		for h in entry['hashtag']:
-			temp= int(h['total'] / 2)
-			h['total'] = temp
+
 
 
 
